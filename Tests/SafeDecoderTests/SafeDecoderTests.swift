@@ -114,6 +114,19 @@ final class SafeDecoderTests: XCTestCase {
         struct TestClass: Codable {
             let value: TestEnum
             let optional: TestEnum?
+            
+            enum CodingKeys: String, FallbackCodingKey {
+                case value, optional
+                
+                func fallbackValue() -> FallbackValue {
+                    switch self {
+                    case .value:
+                        return (true, TestEnum.one)
+                    default:
+                        return (false, nil)
+                    }
+                }
+            }
         }
         
         runDecode(json: ["value": 2], type: TestClass.self, fail: { error in XCTFail("\(error)") }) { obj in
@@ -134,6 +147,10 @@ final class SafeDecoderTests: XCTestCase {
         runDecode(json: ["value": 2, "optional": "3"], type: TestClass.self, fail: { error in XCTFail("\(error)") }) { obj in
             XCTAssertEqual(obj.value, TestEnum.two)
             XCTAssertNil(obj.optional)
+        }
+        
+        runDecode(json: ["value": "x"], type: TestClass.self, fail: { error in XCTFail("\(error)") }) { obj in
+            XCTAssertEqual(obj.value, TestEnum.one)
         }
     }
     
@@ -176,12 +193,12 @@ final class SafeDecoderTests: XCTestCase {
 
                 case value, optional, array, enumValue
 
-                func fallbackValue() -> Any? {
+                func fallbackValue() -> FallbackValue {
                     switch self {
-                    case .value: return 42
-                    case .optional: return 999
-                    case .array: return []
-                    case .enumValue: return TestEnum.one
+                    case .value: return (true, 42)
+                    case .optional: return (true, nil)
+                    case .array: return (true, [])
+                    case .enumValue: return (true, TestEnum.one)
                     }
                 }
             }
@@ -197,6 +214,10 @@ final class SafeDecoderTests: XCTestCase {
             XCTAssertEqual(obj.value, 123)
             XCTAssertEqual(obj.optional, 1)
             XCTAssertEqual(obj.array, [])
+        }
+        runDecode(json: ["optional": "x", "enumValue": "x"], type: TestClass.self, fail: { error in XCTFail("\(error)") }) { obj in
+            XCTAssertNil(obj.optional)
+            XCTAssertEqual(obj.enumValue, .one)
         }
     }
 

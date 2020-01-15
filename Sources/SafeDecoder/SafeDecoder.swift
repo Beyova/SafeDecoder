@@ -17,10 +17,14 @@ public protocol SafeDecodable: Decodable {
     init?(fallbackFrom string: String)
 }
 
+public typealias FallbackValue = (fallback: Bool, value: Any?)
+
 public protocol FallbackCodingKey: CodingKey {
     
-    func fallbackValue() -> Any?
+    func fallbackValue() -> FallbackValue
 }
+
+// MARK: - SafeDecodable Impl
 
 public extension SafeDecodable {
 
@@ -46,65 +50,6 @@ public extension SafeDecodable {
         throw error
     }
 }
-
-private extension SafeDecodable {
-    
-    static func decode<K: CodingKey>(by container: KeyedDecodingContainer<K>, forKey key: KeyedDecodingContainer<K>.Key) throws -> Self {
-        do {
-            return try container.origin_decode(Self.self, forKey: key)
-        } catch let error as DecodingError {
-            do {
-                if let result = try Self(fallbackFrom: error, by: container, forKey: key) {
-                    return result
-                }
-            } catch {}
-            if let customKey = key as? FallbackCodingKey, let val = customKey.fallbackValue(), let result = val as? Self {
-                return result
-            }
-            throw error
-        }
-    }
-    
-    static func decodeIfPresent<K: CodingKey>(by container: KeyedDecodingContainer<K>, forKey key: KeyedDecodingContainer<K>.Key) throws -> Self? {
-        do {
-            return try container.origin_decodeIfPresent(Self.self, forKey: key)
-        } catch let error as DecodingError {
-            do {
-                return try Self(fallbackFrom: error, by: container, forKey: key)
-            } catch {}
-            if let customKey = key as? FallbackCodingKey, let val = customKey.fallbackValue(), let result = val as? Self {
-                return result
-            }
-            throw error
-        }
-    }
-    
-    static func decode(by container: inout UnkeyedDecodingContainer) throws -> Self {
-        do {
-            return try container.decode(Self.self)
-        } catch let error as DecodingError {
-            do {
-                if let result = try Self(fallbackFrom: error, by: &container) {
-                    return result
-                }
-            } catch {}
-            throw error
-        }
-    }
-    
-    static func decodeIfPresent(by container: inout UnkeyedDecodingContainer) throws -> Self? {
-        do {
-            return try container.decodeIfPresent(Self.self)
-        } catch let error as DecodingError {
-            do {
-                return try Self(fallbackFrom: error, by: &container)
-            } catch {}
-            throw error
-        }
-    }
-}
-
-// MARK: - Impl
 
 extension Date: SafeDecodable {
 
@@ -273,10 +218,7 @@ public extension KeyedDecodingContainer {
         do {
             return try origin_decode(type, forKey: key)
         } catch let error as DecodingError {
-            if let customKey = key as? FallbackCodingKey, let val = customKey.fallbackValue(), let result = val as? T {
-                return result
-            }
-            throw error
+            return try key.fallbackFrom(error: error)
         }
     }
     
@@ -291,9 +233,7 @@ public extension KeyedDecodingContainer {
                     }
                     return nil
                 } catch {}
-                if let customKey = key as? FallbackCodingKey, let val = customKey.fallbackValue(), let result = val as? T {
-                    return result
-                }
+                return try key.fallbackFrom(error: error)
             }
             throw error
         }
@@ -304,12 +244,14 @@ public extension KeyedDecodingContainer {
             return try origin_decode(type, forKey: key)
         } catch let error as DecodingError {
             if case DecodingError.typeMismatch(_, _) = error {
-                let rawValue = try decode(T.RawValue.self, forKey: key)
-                if let result = T(rawValue: rawValue) {
-                    return result
-                }
+                do {
+                    let rawValue = try T.RawValue.decode(by: self, forKey: key, fallback: false)
+                    if let result = T(rawValue: rawValue) {
+                        return result
+                    }
+                } catch {}
             }
-            throw error
+            return try key.fallbackFrom(error: error)
         }
     }
     
@@ -319,11 +261,14 @@ public extension KeyedDecodingContainer {
         } catch let error as DecodingError {
             switch error {
             case .typeMismatch(_, _), .dataCorrupted(_):
-                guard let rawValue = try decodeIfPresent(T.RawValue.self, forKey: key) else { return nil }
-                return T(rawValue: rawValue)
+                do {
+                    guard let rawValue = try T.RawValue.decodeIfPresent(by: self, forKey: key, fallback: false) else { return nil }
+                    return T(rawValue: rawValue)
+                } catch {}
             default:
-                throw error
+                break
             }
+            return try key.fallbackFrom(error: error)
         }
     }
 }
@@ -367,6 +312,78 @@ public extension KeyedDecodingContainer {
 }
 
 // MARK: - Private
+
+private extension SafeDecodable {
+    
+    static func decode<K: CodingKey>(by container: KeyedDecodingContainer<K>, forKey key: KeyedDecodingContainer<K>.Key, fallback: Bool = true) throws -> Self {
+        do {
+            return try container.origin_decode(Self.self, forKey: key)
+        } catch let error as DecodingError {
+            do {
+                if let result = try Self(fallbackFrom: error, by: container, forKey: key) {
+                    return result
+                }
+            } catch {}
+            if fallback {
+                return try key.fallbackFrom(error: error)
+            } else {
+                throw error
+            }
+        }
+    }
+    
+    static func decodeIfPresent<K: CodingKey>(by container: KeyedDecodingContainer<K>, forKey key: KeyedDecodingContainer<K>.Key, fallback: Bool = true) throws -> Self? {
+        do {
+            return try container.origin_decodeIfPresent(Self.self, forKey: key)
+        } catch let error as DecodingError {
+            do {
+                return try Self(fallbackFrom: error, by: container, forKey: key)
+            } catch {}
+            if fallback {
+                return try key.fallbackFrom(error: error)
+            } else {
+                throw error
+            }
+        }
+    }
+    
+    static func decode(by container: inout UnkeyedDecodingContainer) throws -> Self {
+        do {
+            return try container.decode(Self.self)
+        } catch let error as DecodingError {
+            do {
+                if let result = try Self(fallbackFrom: error, by: &container) {
+                    return result
+                }
+            } catch {}
+            throw error
+        }
+    }
+    
+    static func decodeIfPresent(by container: inout UnkeyedDecodingContainer) throws -> Self? {
+        do {
+            return try container.decodeIfPresent(Self.self)
+        } catch let error as DecodingError {
+            do {
+                return try Self(fallbackFrom: error, by: &container)
+            } catch {}
+            throw error
+        }
+    }
+}
+
+private extension CodingKey {
+    
+    func fallbackFrom<T>(error: Error) throws -> T {
+        if let customKey = self as? FallbackCodingKey {
+            let (fallback, val) = customKey.fallbackValue()
+            if fallback, let result = val as? T {
+                return result
+            }
+        }
+        throw error
+    }
+}
 
 private extension KeyedDecodingContainerProtocol {
     

@@ -45,9 +45,9 @@ struct User: Codable {
     
     enum CodingKeys: String, FallbackCodingKey 
         case gender
-        func fallbackValue() -> Any? {
+        func fallbackValue() -> FallbackValue {
             switch self {
-            case .gender: return Gender.unknown
+            case .gender: return (true, Gender.unknown)
             }
         }
     }
