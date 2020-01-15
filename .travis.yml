@@ -1,0 +1,6 @@
+language: swift
+osx_image: xcode11
+xcode_sdk: iphonesimulator11.1
+script:
+- set -o pipefail
+- travis_retry swift test | xcpretty
