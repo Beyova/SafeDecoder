@@ -11,10 +11,13 @@ import SafeDecoder
 
 final class SafeDecoderTests: XCTestCase {
 
-    let decoder = JSONDecoder()
+    let decoder = SafeDecoder()
     
     override func setUp() {
         decoder.dateDecodingStrategy = .iso8601
+        decoder.config.onError = { error, value in
+            print("SafeDecoder error: \(error) for value: \(value)")
+        }
     }
 
     override func tearDown() {
@@ -159,6 +162,22 @@ final class SafeDecoderTests: XCTestCase {
         })
     }
     
+    func testURL() {
+        struct TestClass: Codable {
+            let url: URL?
+            let string: String?
+        }
+        XCTAssertSuccessReturn(try decode(json: ["url": "I'm not a URL"], type: TestClass.self) { obj in
+            XCTAssertNil(obj.url)
+            XCTAssertNil(obj.string)
+        })
+
+        XCTAssertSuccessReturn(try decode(json: ["url": "beyova://test/abc", "string": "some String"], type: TestClass.self) { obj in
+            XCTAssertEqual(obj.url?.absoluteString, "beyova://test/abc")
+            XCTAssertNotNil(obj.string)
+        })
+    }
+    
     func testArrayOfArray() {
         struct TestClass: Codable {
             let array: [[Int]]
@@ -234,6 +253,43 @@ final class SafeDecoderTests: XCTestCase {
         })
     }
     
+    func testMultiThread() {
+        struct TestClass: Codable {
+            let value: Int
+        }
+        let exp = expectation(description: "decode multi-thread JSONDecoder vs SafeDecoder")
+        exp.expectedFulfillmentCount = 100
+        
+        let decoder = JSONDecoder()
+        let safeDecoder = SafeDecoder()
+        let json = ["value": "1"]
+        let data = try! JSONSerialization.data(withJSONObject: json, options: [])
+        
+        for _ in 0..<50 {
+            DispatchQueue.global().async {
+                do {
+                    _ = try decoder.decode(TestClass.self, from: data)
+                } catch {
+                    exp.fulfill()
+                }
+            }
+        }
+        
+        for _ in 0..<50 {
+            DispatchQueue.global().async {
+                do {
+                    let obj = try safeDecoder.decode(TestClass.self, from: data)
+                    XCTAssertEqual(obj.value, 1)
+                    exp.fulfill()
+                } catch {
+                    XCTFail("\(error)")
+                }
+            }
+        }
+        
+        wait(for: [exp], timeout: 3)
+    }
+    
     private func decode<T: Codable>(json: Any, type: T.Type, validation: (_ obj: T) -> Void) throws {
         let data = try JSONSerialization.data(withJSONObject: json, options: [])
         let obj = try decoder.decode(T.self, from: data)
@@ -241,11 +297,10 @@ final class SafeDecoderTests: XCTestCase {
     }
 }
 
-func XCTAssertSuccessReturn<T>(_ expression: @autoclosure () throws -> T, in file: StaticString = #file, line: UInt = #line) -> T {
+func XCTAssertSuccessReturn<T>(_ expression: @autoclosure () throws -> T, in file: StaticString = #file, line: UInt = #line) {
     do {
-        return try expression()
+        _ = try expression()
     } catch {
         XCTFail("\(error)", file: file, line: line)
-        fatalError("\(error)")
     }
 }

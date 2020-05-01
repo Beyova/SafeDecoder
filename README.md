@@ -26,7 +26,7 @@ import SafeDecoder
 class User: Codable {
 	var id: Int
 }
-let decoder = JSONDecoder()
+let decoder = SafeDecoder()
 let data = try JSONSerialization.data(withJSONObject: ["id": "42"], options: [])
 let result = try decoder.decode(User.self, from: data)
 ```
