@@ -14,7 +14,7 @@ extension Date: SafeDecodable {
 
     public init?<K: CodingKey>(fallbackFrom error: DecodingError, by container: KeyedDecodingContainer<K>, forKey key: K, config: SafeDecoder.Config) throws {
         if case DecodingError.dataCorrupted(_) = error {
-            let string = try container.decode(String.self, forKey: key)
+            let string = try container.origin_decode(String.self, forKey: key)
             if string.isEmpty { return nil }
         }
         throw error
@@ -35,7 +35,7 @@ extension URL: SafeDecodable {
 
     public init?<K: CodingKey>(fallbackFrom error: DecodingError, by container: KeyedDecodingContainer<K>, forKey key: K, config: SafeDecoder.Config) throws {
         if case DecodingError.dataCorrupted(_) = error {
-            let string = try container.decode(String.self, forKey: key)
+            let string = try container.origin_decode(String.self, forKey: key)
             config.onError?(error, string)
             return nil
         }
@@ -153,6 +153,47 @@ public extension KeyedDecodingContainer {
 }
 
 // MARK: - Simple
+
+extension String: SafeDecodable {
+
+    public init?<K: CodingKey>(fallbackFrom error: DecodingError, by container: KeyedDecodingContainer<K>, forKey key: K, config: SafeDecoder.Config) throws {
+        if case DecodingError.typeMismatch = error {
+            if let val = try? container.origin_decode(Int64.self, forKey: key) {
+                self = String(val)
+                return
+            }
+            if let val = try? container.origin_decode(Double.self, forKey: key) {
+                self = String(val)
+                return
+            }
+            if let val = try? container.origin_decode(Bool.self, forKey: key) {
+                self = String(val)
+                return
+            }
+        }
+        throw error
+    }
+    
+    public init?(fallbackFrom error: DecodingError, by container: inout UnkeyedDecodingContainer, config: SafeDecoder.Config) throws {
+        if case DecodingError.typeMismatch = error {
+            if let val = try? container.decode(Int64.self) {
+                self = String(val)
+                return
+            }
+            if let val = try? container.decode(Double.self) {
+                self = String(val)
+                return
+            }
+            if let val = try? container.decode(Bool.self) {
+                self = String(val)
+                return
+            }
+        }
+        throw error
+    }
+    
+    public init?(fallbackFrom string: String) { nil }
+}
 
 extension Bool: SafeDecodable {
     

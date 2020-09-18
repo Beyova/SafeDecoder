@@ -45,7 +45,7 @@ public extension SafeDecodable {
 
     init?<K: CodingKey>(fallbackFrom error: DecodingError, by container: KeyedDecodingContainer<K>, forKey key: KeyedDecodingContainer<K>.Key, config: SafeDecoder.Config) throws {
         if case DecodingError.typeMismatch(_, _) = error {
-            let string = try container.decode(String.self, forKey: key)
+            let string = try container.origin_decode(String.self, forKey: key)
             if let val =  Self(fallbackFrom: string) {
                 self = val
                 return
@@ -144,6 +144,7 @@ extension SafeDecodable {
 public extension KeyedDecodingContainer {
     
     func decode<T: SafeDecodable>(_ type: T.Type, forKey key: Self.Key) throws -> T { try type.decode(by: self, forKey: key) }
+    func decode(_ type: String.Type, forKey key: Self.Key) throws -> String { try type.decode(by: self, forKey: key) }
     func decode(_ type: Bool.Type, forKey key: Self.Key) throws -> Bool { try type.decode(by: self, forKey: key) }
     func decode(_ type: Double.Type, forKey key: Self.Key) throws -> Double { try type.decode(by: self, forKey: key) }
     func decode(_ type: Float.Type, forKey key: Self.Key) throws -> Float { try type.decode(by: self, forKey: key) }
@@ -162,6 +163,7 @@ public extension KeyedDecodingContainer {
 public extension KeyedDecodingContainer {
     
     func decodeIfPresent<T: SafeDecodable>(_ type: T.Type, forKey key: Self.Key) throws -> T? { try type.decodeIfPresent(by: self, forKey: key) }
+    func decodeIfPresent(_ type: String.Type, forKey key: Self.Key) throws -> String? { try type.decodeIfPresent(by: self, forKey: key) }
     func decodeIfPresent(_ type: Bool.Type, forKey key: Self.Key) throws -> Bool? { try type.decodeIfPresent(by: self, forKey: key) }
     func decodeIfPresent(_ type: Double.Type, forKey key: Self.Key) throws -> Double? { try type.decodeIfPresent(by: self, forKey: key) }
     func decodeIfPresent(_ type: Float.Type, forKey key: Self.Key) throws -> Float? { try type.decodeIfPresent(by: self, forKey: key) }
@@ -179,6 +181,7 @@ public extension KeyedDecodingContainer {
 
 extension KeyedDecodingContainerProtocol {
     
+    func origin_decode(_ type: String.Type, forKey key: Self.Key) throws -> String { try self.decode(type, forKey: key) }
     func origin_decode(_ type: Bool.Type, forKey key: Self.Key) throws -> Bool { try self.decode(type, forKey: key) }
     func origin_decode(_ type: Double.Type, forKey key: Self.Key) throws -> Double { try self.decode(type, forKey: key) }
     func origin_decode(_ type: Float.Type, forKey key: Self.Key) throws -> Float { try self.decode(type, forKey: key) }
@@ -197,6 +200,7 @@ extension KeyedDecodingContainerProtocol {
 
 extension KeyedDecodingContainerProtocol {
     
+    func origin_decodeIfPresent(_ type: String.Type, forKey key: Self.Key) throws -> String? { try self.decodeIfPresent(type, forKey: key) }
     func origin_decodeIfPresent(_ type: Bool.Type, forKey key: Self.Key) throws -> Bool? { try self.decodeIfPresent(type, forKey: key) }
     func origin_decodeIfPresent(_ type: Double.Type, forKey key: Self.Key) throws -> Double? { try self.decodeIfPresent(type, forKey: key) }
     func origin_decodeIfPresent(_ type: Float.Type, forKey key: Self.Key) throws -> Float? { try self.decodeIfPresent(type, forKey: key) }

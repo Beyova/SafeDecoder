@@ -23,6 +23,30 @@ final class SafeDecoderTests: XCTestCase {
     override func tearDown() {
     }
     
+    func testString() {
+        struct TestClass: Codable {
+            let value1: String
+            let value2: String
+            let value3: String
+        }
+        XCTAssertSuccessReturn(try decode(json: ["value1": 1, "value2": 1.1, "value3": true], type: TestClass.self) { obj in
+            XCTAssertEqual(obj.value1, "1")
+            XCTAssertEqual(obj.value2, "1.1")
+            XCTAssertEqual(obj.value3, "true")
+        })
+    }
+    
+    func testStringArray() {
+        struct TestClass: Codable {
+            let value: [String]
+        }
+        XCTAssertSuccessReturn(try decode(json: ["value": [1, 1.1, true]], type: TestClass.self) { obj in
+            XCTAssertEqual(obj.value[0], "1")
+            XCTAssertEqual(obj.value[1], "1.1")
+            XCTAssertEqual(obj.value[2], "true")
+        })
+    }
+    
     func testInt() {
         struct TestClass: Codable {
             let value: Int
@@ -44,7 +68,7 @@ final class SafeDecoderTests: XCTestCase {
         })
     }
     
-    func testString() {
+    func testStringOrigin() {
         struct TestClass: Codable {
             let value: String
             let optional: String?
