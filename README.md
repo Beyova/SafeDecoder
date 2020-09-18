@@ -31,6 +31,17 @@ let data = try JSONSerialization.data(withJSONObject: ["id": "42"], options: [])
 let result = try decoder.decode(User.self, from: data)
 ```
 
+#### Decode String type when acture json is primitive
+
+```swift
+class User: Codable {
+	var id: String
+}
+let decoder = SafeDecoder()
+let data = try JSONSerialization.data(withJSONObject: ["id": 42], options: [])
+let result = try decoder.decode(User.self, from: data)
+```
+
 #### Customize fallback value when decode fail
 
 ```swift
